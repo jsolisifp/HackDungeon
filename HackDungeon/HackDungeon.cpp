@@ -741,14 +741,14 @@ int main()
     {
         system("cls");
 
-        printf("+==============+\n");
-        printf("| Hack Dungeon |\n");
-        printf("+==============+\n");
-
-        printf("1.- Dungeon 1\n");
-        printf("2.- Dungeon 2\n");
-
-        printf("0.- Exit\n");
+        printf(" +==============+\n");
+        printf(" | Hack Dungeon |\n");
+        printf(" +==============+\n");
+        printf("\n");
+        printf(" 1.- Dungeon 1\n");
+        printf(" 2.- Dungeon 2\n");
+        printf("\n");
+        printf(" 0.- Exit\n");
 
         code = _getch();
 
