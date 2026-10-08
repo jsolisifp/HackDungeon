@@ -3,83 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <windows.h>
-
-#define ITEMTYPE_FOOD 0
-#define ITEMTYPE_SWORD 1
-#define ITEMTYPE_KEY 2
-
-#define CELLTYPE_EMPTY 0
-#define CELLTYPE_WALL 1
-#define CELLTYPE_DOOR 2
-
-#define GAMESTATE_PLAYING 0
-#define GAMESTATE_DEAD 1
-#define GAMESTATE_ESCAPED 2
-
-#define ENEMYTYPE_SPIDER 0
-#define ENEMYTYPE_SNAKE 1
-#define ENEMYTYPE_BAT 2
-
-#define SPIDER_RADIUS 5
-#define SPIDER_MINHEALTH 5
-#define SPIDER_MAXHEALTH 10
-#define SPIDER_MINDAMAGE 0
-#define SPIDER_MAXDAMAGE 2
-
-
-#define WEAPONFISTS_MINDAMAGE 1
-#define WEAPONFISTS_MAXDAMAGE 2
-
-#define WEAPONSWORD_MINDAMAGE 3
-#define WEAPONSWORD_MAXDAMAGE 6
-
-
-struct Map
-{
-    unsigned int width;
-    unsigned int height;
-    unsigned int cells[16 * 32];
-};
-
-struct Position
-{
-    int x;
-    int y;
-};
-
-struct Stats
-{
-    float health;
-    float magic;
-    float strength;
-};
-
-struct Inventory
-{
-    unsigned int numItems;
-    unsigned char items[10];
-};
-
-struct Player
-{
-    Position position;
-    Stats stats;
-    Inventory inventory;
-};
-
-struct Enemy
-{
-    unsigned int type;
-    Position position;
-    float health;
-};
-
-struct Item
-{
-    unsigned char type;
-    Position position;
-    unsigned char collected;
-};
+#include "HackDungeon.hpp"
 
 char name[100] = "Player";
 Player player;
@@ -87,25 +11,35 @@ Map map;
 
 
 unsigned int numEnemies;
-Enemy enemies[10];
+Enemy enemies[MAX_ENEMIES];
 
 unsigned int numItems;
-Item items[10];
+Item items[MAX_ITEMS];
 
 char playerCharacter = '@';
 char enemyCharacter[10] = "*~^";
 char itemCharacter[10] = ".+P";
 char mapCellCharacters[10] = " #]";
 
-unsigned int screenWidth = 32;
-unsigned int screenHeight = 16;
-char screen[16 * 32];
+unsigned int screenWidth = MAP_WIDTH;
+unsigned int screenHeight = MAP_HEIGHT;
+char screen[MAP_HEIGHT * MAP_WIDTH];
 
 int gameState;
 
 unsigned char equalPos(Position p1, Position p2)
 {
     return p1.x == p2.x && p1.y == p2.y;
+}
+
+int distance(Position p1, Position p2)
+{
+    return abs(p1.x - p2.x) + abs(p1.y - p2.y);
+}
+
+int randRange(int min, int max)
+{
+    return min + rand() % (max - min + 1);
 }
 
 int toMapIndex(int x, int y)
@@ -169,6 +103,108 @@ void setMapHLine(int x, int y, int length, unsigned int type)
 void setMapVLine(int x, int y, int length, unsigned int type)
 {
     setMapLine(x, y, 0, 1, length, type);
+}
+
+int loadMap(int dungeon)
+{
+    char fileName[100];
+    sprintf_s(fileName, "dungeon%d.map", dungeon + 1);
+
+    FILE* f;
+
+    fopen_s(&f, fileName, "rb");
+
+    if (f)
+    {
+        fread(&map.width, sizeof(unsigned int), 1, f);
+        fread(&map.height, sizeof(unsigned int), 1, f);
+        for (int i = 0; i < map.height; i++)
+        {
+            for (int j = 0; j < map.width; j++)
+            {
+                fread(&map.cells[i * map.width + j], sizeof(unsigned int), 1, f);
+            }
+        }
+
+        fread(&player.position.x, sizeof(int), 1, f);
+        fread(&player.position.y, sizeof(int), 1, f);
+
+        fread(&numItems, sizeof(unsigned int), 1, f);
+        for (int i = 0; i < numItems; i++)
+        {
+            fread(&items[i].type, sizeof(unsigned int), 1, f);
+            fread(&items[i].position.x, sizeof(int), 1, f);
+            fread(&items[i].position.y, sizeof(int), 1, f);
+        }
+
+        fread(&numEnemies, sizeof(unsigned int), 1, f);
+        for (int i = 0; i < numEnemies; i++)
+        {
+            fread(&enemies[i].type, sizeof(unsigned int), 1, f);
+            fread(&enemies[i].position.x, sizeof(int), 1, f);
+            fread(&enemies[i].position.y, sizeof(int), 1, f);
+        }
+
+        fclose(f);
+
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+
+}
+
+void saveMap(int dungeon)
+{
+    char fileName[100];
+    sprintf_s(fileName, "dungeon%d.map", dungeon + 1);
+
+    FILE* f;
+
+    fopen_s(&f, fileName, "wb");
+
+    if (f != 0)
+    {
+        fwrite(&map.width, sizeof(unsigned int), 1, f);
+        fwrite(&map.height, sizeof(unsigned int), 1, f);
+        for (int i = 0; i < map.height; i++)
+        {
+            for (int j = 0; j < map.width; j++)
+            {
+                fwrite(&map.cells[i * map.width + j], sizeof(unsigned int), 1, f);
+            }
+        }
+
+        fwrite(&player.position.x, sizeof(int), 1, f);
+        fwrite(&player.position.y, sizeof(int), 1, f);
+
+        fwrite(&numItems, sizeof(unsigned int), 1, f);
+        for (int i = 0; i < numItems; i++)
+        {
+            fwrite(&items[i].type, sizeof(unsigned int), 1, f);
+            fwrite(&items[i].position.x, sizeof(int), 1, f);
+            fwrite(&items[i].position.y, sizeof(int), 1, f);
+        }
+
+        fwrite(&numEnemies, sizeof(unsigned int), 1, f);
+        for (int i = 0; i < numEnemies; i++)
+        {
+            fwrite(&enemies[i].type, sizeof(unsigned int), 1, f);
+            fwrite(&enemies[i].position.x, sizeof(int), 1, f);
+            fwrite(&enemies[i].position.y, sizeof(int), 1, f);
+        }
+
+        fclose(f);
+
+    }
+    else
+    {
+        printf("Cannot save file");
+        Sleep(1000);
+    }
+
 }
 
 unsigned char hasItem(unsigned char type)
@@ -246,7 +282,7 @@ void showStatus()
     printf("\n");
     for (unsigned int i = 0; i < numEnemies; i++)
     {
-        if (enemies[i].health > 0)
+        if (enemies[i].health > 0 && distance(enemies[i].position, player.position) < PLAYER_SEERADIUS)
         {
             printf("%c [ HP: %0.2f ]\n", enemyCharacter[enemies[i].type], enemies[i].health);
         }
@@ -258,14 +294,14 @@ void showStatus()
 
 void showScreen()
 {
-    char screenLine[32 + 1];
+    char screenLine[MAP_WIDTH + 1];
 
     for (unsigned int i = 0; i < screenHeight; i++)
     {
         strncpy_s(screenLine, &screen[i * screenWidth], screenWidth);
-        screenLine[32] = '\0';
+        screenLine[MAP_WIDTH] = '\0';
 
-        char line[32 + 2 + 1];
+        char line[MAP_WIDTH + 2 + 1];
 
         sprintf_s(line, "%s\n", screenLine);
 
@@ -289,18 +325,14 @@ void badBeep()
 
 void neutralBeep()
 {
-    Beep(60, 100);
+    Beep(60, 200);
 }
 
-int distance(Position p1, Position p2)
+void dangerBeep()
 {
-    return abs(p1.x - p2.x) + abs(p1.y - p2.y);
+    Beep(440, 200);
 }
 
-int randRange(int min, int max)
-{
-    return min + rand() % (max - min + 1);
-}
 
 Position moveTo(Position pos, Position target)
 {
@@ -338,14 +370,30 @@ void updateEnemy(int i)
 
     char moveCancelled = 0;
 
+    int radius;
+    int damage;
+
+    if (enemy.type == ENEMYTYPE_SPIDER)
+    {
+        radius = SPIDER_RADIUS;
+        damage = randRange(SPIDER_MINDAMAGE, SPIDER_MAXDAMAGE);
+    }
+    else if (enemy.type == ENEMYTYPE_BAT)
+    {
+        radius = BAT_RADIUS;
+        damage = randRange(BAT_MINDAMAGE, BAT_MAXDAMAGE);
+    }
+    else // enemy.type == ENEMYTYPE_SNAKE
+    {
+        radius = SNAKE_RADIUS;
+        damage = randRange(SNAKE_MINDAMAGE, SNAKE_MAXDAMAGE);
+    }
+
     if(enemy.health > 0)
     {
-        if(enemy.type == ENEMYTYPE_SPIDER)
+        if (distance(enemy.position, player.position) <= radius)
         {
-            if (distance(enemy.position, player.position) <= SPIDER_RADIUS)
-            {
-                nextPos = moveTo(enemy.position, player.position);
-            }
+            nextPos = moveTo(enemy.position, player.position);
         }
 
         unsigned int nextCell = map.cells[posToMapIndex(nextPos)];
@@ -361,27 +409,28 @@ void updateEnemy(int i)
         {
             if (equalPos(nextPos, player.position))
             {
-                if (enemy.type == ENEMYTYPE_SPIDER)
+                char name[100];
+                if (enemy.type == ENEMYTYPE_SPIDER) { sprintf_s(name, "SPIDER"); }
+                else if (enemy.type == ENEMYTYPE_BAT) { sprintf_s(name, "BAT"); }
+                else// enemy.type == ENEMYTYPE_SNAKE)
+                { sprintf_s(name, "SNAKE"); }
+                printf("** A %s attacked you!! [-%d] **\n", name, damage);
+                badBeep();
+                Sleep(1000);
+
+                player.stats.health -= damage;
+                if (player.stats.health <= 0)
                 {
-                    int damage = SPIDER_MINDAMAGE + rand() % (SPIDER_MAXDAMAGE - SPIDER_MINDAMAGE + 1);
-                    printf("** A spider attacked you!! [-%d] **\n", damage);
+                    player.stats.health = 0;
+                    printf("** Ooops! You were killed! **\n");
                     badBeep();
                     Sleep(1000);
 
-                    player.stats.health -= damage;
-                    if (player.stats.health < 0)
-                    {
-                        player.stats.health = 0;
-                        printf("** Ooops! You were killed! **\n");
-                        badBeep();
-                        Sleep(1000);
+                    gameState = GAMESTATE_DEAD;
 
-                        gameState = GAMESTATE_DEAD;
-
-                    }
-
-                    moveCancelled = 1;
                 }
+
+                moveCancelled = 1;
             }
         }
 
@@ -391,8 +440,8 @@ void updateEnemy(int i)
         {
             enemy.position = nextPos;
             printf("Enemy moving\n");
-            neutralBeep();
-            Sleep(1000);
+            dangerBeep();
+            Sleep(200);
 
         }
 
@@ -410,7 +459,7 @@ void initPlayer()
         player.inventory.items[i] = 0;
     }
 
-    player.stats.health = 100;
+    player.stats.health = PLAYER_HEALTH;
     player.stats.magic = 50;
     player.stats.strength = 50;
 }
@@ -531,8 +580,8 @@ void updatePlayer()
 
                 if (items[i].type == ITEMTYPE_FOOD)
                 {
-                    player.stats.health += 20.0f;
-                    printf("Delicious food! [+20]\n");
+                    player.stats.health += FOOD_HEALTHUP;
+                    printf("Delicious food! [+10]\n");
                     goodBeep();
                     Sleep(1000);
 
@@ -570,7 +619,8 @@ void updatePlayer()
 
         player.position = nextPos;
         neutralBeep();
-        Sleep(100);
+        Sleep(200);
+
     }
 
 }
@@ -578,8 +628,8 @@ void updatePlayer()
 
 void initMap()
 {
-    map.width = 32;
-    map.height = 16;
+    map.width = MAP_WIDTH;
+    map.height = MAP_HEIGHT;
 
     for (unsigned int i = 0; i < map.height; i++)
     {
@@ -595,61 +645,53 @@ void initMap()
     }
 }
 
-void initEnemy(unsigned int i, int x, int y, unsigned int type)
+void initEnemy(unsigned int i)
 {
-    enemies[i].type = type;
-    enemies[i].position.x = x;
-    enemies[i].position.y = y;
+    unsigned int type = enemies[i].type;
 
     if (type == ENEMYTYPE_SPIDER)
     {
         enemies[i].health = SPIDER_MINHEALTH + rand() % (SPIDER_MAXHEALTH - SPIDER_MINHEALTH);
     }
+    else if (type == ENEMYTYPE_BAT)
+    {
+        enemies[i].health = BAT_MINHEALTH + rand() % (BAT_MAXHEALTH - BAT_MINHEALTH);
+    }
+    else // type == ENEMYTYPE_SNAKE
+    {
+        enemies[i].health = SNAKE_MINHEALTH + rand() % (SNAKE_MAXHEALTH - SNAKE_MINHEALTH);
+    }
+}
+
+void initItem(unsigned int i)
+{
+    items[i].collected = 0;
+}
+
+void initEnemy(unsigned int i, int x, int y, unsigned int type)
+{
+    if (type == ENEMYTYPE_SPIDER)
+    {
+        enemies[i].health = SPIDER_MINHEALTH + rand() % (SPIDER_MAXHEALTH - SPIDER_MINHEALTH);
+    }
+    else if (type == ENEMYTYPE_BAT)
+    {
+        enemies[i].health = BAT_MINHEALTH + rand() % (BAT_MAXHEALTH - BAT_MINHEALTH);
+    }
+    else // type == ENEMYTYPE_SNAKE
+    {
+        enemies[i].health = SNAKE_MINHEALTH + rand() % (SNAKE_MAXHEALTH - SNAKE_MINHEALTH);
+    }
 }
 
 void playDungeon(int dungeon)
 {
+    loadMap(dungeon);
+
     initPlayer();
 
-    numEnemies = 0;
-    numItems = 0;
-
-    initMap();
-
-    if (dungeon == 0)
-    {
-        player.position.x = 29;
-        player.position.y = 3;
-
-        numEnemies = 2;
-
-        initEnemy(0, 10, 10, ENEMYTYPE_SPIDER);
-        initEnemy(1, 20, 12, ENEMYTYPE_SPIDER);
-
-        numItems = 3;
-
-        items[0].type = ITEMTYPE_FOOD;
-        items[0].position.x = 2;
-        items[0].position.y = 4;
-        items[0].collected = 0;
-
-        items[1].type = ITEMTYPE_SWORD;
-        items[1].position.x = 16;
-        items[1].position.y = 14;
-        items[1].collected = 0;
-
-        items[2].type = ITEMTYPE_KEY;
-        items[2].position.x = 29;
-        items[2].position.y = 14;
-        items[2].collected = 0;
-
-        setMapCell(0, 8, 2);
-
-        setMapHLine(8, 5, 10, 1);
-        setMapHLine(15, 10, 10, 1);
-
-
-    }
+    for (int i = 0; i < numEnemies; i++) { initEnemy(i); }
+    for (int i = 0; i < numItems; i++) { initItem(i); }
 
     gameState = GAMESTATE_PLAYING;
 
@@ -699,13 +741,12 @@ int main()
     {
         system("cls");
 
-        printf("Hack dungeon\n");
-        printf("============\n");
+        printf("+==============+\n");
+        printf("| Hack Dungeon |\n");
+        printf("+==============+\n");
 
         printf("1.- Dungeon 1\n");
         printf("2.- Dungeon 2\n");
-        printf("3.- Dungeon 3\n");
-        printf("4.- Dungeon 4\n");
 
         printf("0.- Exit\n");
 
@@ -713,8 +754,6 @@ int main()
 
         if (code == '1') { playDungeon(0); }
         else if (code == '2') { playDungeon(1); }
-        else if (code == '3') { playDungeon(2); }
-        else if (code == '4') { playDungeon(3); }
 
     }
 
